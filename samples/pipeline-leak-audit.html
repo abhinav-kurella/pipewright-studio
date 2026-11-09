@@ -1,0 +1,340 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Pipeline Leak Audit Sample</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<meta name="robots" content="noindex, nofollow">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Libre+Baskerville:ital,wght@0,400;0,700;1,400&family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
+<style>
+/* Layout: a consultant's audit report in the Pipewright drawing style.
+   Cover block, findings ranked by severity, one funnel chart, sourced benchmarks. */
+:root {
+  --bg: #EDF0EE;
+  --surface: #F7F8F7;
+  --ink: #111A1C;
+  --muted: #56625F;
+  --line: #CBD3D0;
+  --pipe: #9AA7A3;
+  --accent: #A9761B;
+  --accent-soft: #E9DDC4;
+  --high: #B23A2B;
+  --high-soft: #F3DAD5;
+  --med: #8A6A12;
+  --med-soft: #F0E6C8;
+  --ok: #2F6B4F;
+  --ok-soft: #D6E8DE;
+  --display: "Libre Baskerville", Georgia, "Times New Roman", serif;
+  --body: "IBM Plex Sans", "Helvetica Neue", Arial, system-ui, sans-serif;
+  --mono: "IBM Plex Mono", ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
+  --radius: 6px;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0E1415; --surface: #151D1F; --ink: #E4EBE9; --muted: #95A39F;
+    --line: #2A3537; --pipe: #4A5856; --accent: #D9A748; --accent-soft: #3A2F1A;
+    --high: #F08A7A; --high-soft: #3D211D; --med: #E2C066; --med-soft: #36301A;
+    --ok: #7CC6A0; --ok-soft: #1B3328;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #0E1415; --surface: #151D1F; --ink: #E4EBE9; --muted: #95A39F;
+  --line: #2A3537; --pipe: #4A5856; --accent: #D9A748; --accent-soft: #3A2F1A;
+  --high: #F08A7A; --high-soft: #3D211D; --med: #E2C066; --med-soft: #36301A;
+  --ok: #7CC6A0; --ok-soft: #1B3328;
+  color-scheme: dark;
+}
+*, *::before, *::after { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); color: var(--ink); font: 400 1rem/1.6 var(--body); -webkit-font-smoothing: antialiased; }
+a { color: inherit; }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
+.wrap {
+  max-width: 960px; margin-inline: auto;
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+}
+@media (min-width: 720px) { .wrap { padding-left: max(32px, env(safe-area-inset-left, 0px)); padding-right: max(32px, env(safe-area-inset-right, 0px)); } }
+h1, h2, h3 { font-family: var(--display); font-weight: 700; letter-spacing: -0.01em; line-height: 1.16; margin: 0; text-wrap: balance; }
+h1 { font-size: clamp(2rem, 1.4rem + 2.6vw, 3.1rem); }
+h2 { font-size: clamp(1.45rem, 1.2rem + 1vw, 1.9rem); }
+h3 { font-size: 1.15rem; letter-spacing: -0.01em; line-height: 1.3; }
+p { margin: 0; max-width: 66ch; }
+.label { font: 500 0.75rem/1.4 var(--mono); letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); }
+.muted { color: var(--muted); }
+section { padding-block: 48px; border-top: 1px solid var(--line); }
+.head { display: grid; gap: 10px; margin-bottom: 28px; }
+.num { font-variant-numeric: tabular-nums; }
+
+.sample-band { background: var(--ink); color: var(--bg); }
+.sample-band .wrap { padding-block: 10px; display: flex; flex-wrap: wrap; gap: 8px 16px; align-items: center; justify-content: space-between; font: 500 0.8125rem/1.4 var(--mono); }
+
+.cover { padding-block: 48px 40px; display: grid; gap: 28px; }
+.brand { display: flex; align-items: center; gap: 10px; }
+.brand svg { width: 28px; height: 28px; }
+.brand-name { font: 700 1.15rem/1 var(--display); letter-spacing: -0.02em; }
+.brand-name span { font-weight: 400; color: var(--muted); }
+.meta { display: grid; grid-template-columns: repeat(4, 1fr); border: 1px solid var(--ink); }
+.meta > div { padding: 10px 12px; display: grid; gap: 4px; min-width: 0; }
+.meta > div + div { border-left: 1px solid var(--ink); }
+.meta .v { font: 500 0.875rem/1.3 var(--mono); }
+@media (max-width: 720px) {
+  .meta { grid-template-columns: 1fr 1fr; }
+  .meta > div + div { border-left: 0; }
+  .meta > div:nth-child(even) { border-left: 1px solid var(--ink); }
+  .meta > div:nth-child(n+3) { border-top: 1px solid var(--ink); }
+}
+
+.summary { display: grid; grid-template-columns: 220px 1fr; gap: 32px; align-items: start; }
+@media (max-width: 720px) { .summary { grid-template-columns: 1fr; } }
+.score { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); padding: 22px; display: grid; gap: 8px; justify-items: start; }
+.score-num { font: 700 3.4rem/1 var(--display); letter-spacing: -0.03em; }
+.score-num small { font-size: 1.1rem; color: var(--muted); font-weight: 400; }
+.meter { width: 100%; height: 8px; border-radius: 4px; background: var(--line); overflow: hidden; }
+.meter i { display: block; height: 100%; width: 54%; background: var(--accent); }
+.findings { display: grid; gap: 14px; }
+.finding { display: grid; grid-template-columns: auto 1fr; gap: 12px; align-items: baseline; }
+.big-claim { margin-top: 6px; padding: 16px 18px; border-left: 3px solid var(--accent); background: var(--surface); font: 500 1.1rem/1.45 var(--display); letter-spacing: -0.01em; max-width: none; }
+
+.pill { display: inline-block; font: 500 0.6875rem/1 var(--mono); letter-spacing: .06em; text-transform: uppercase; padding: 5px 8px; border-radius: 999px; white-space: nowrap; }
+.pill.high { background: var(--high-soft); color: var(--high); }
+.pill.med { background: var(--med-soft); color: var(--med); }
+.pill.ok { background: var(--ok-soft); color: var(--ok); }
+
+.table-wrap { overflow-x: auto; border: 1px solid var(--line); border-radius: var(--radius); background: var(--surface); }
+table { width: 100%; border-collapse: collapse; min-width: 640px; font-size: 0.9375rem; }
+th, td { text-align: left; padding: 12px 14px; border-bottom: 1px solid var(--line); vertical-align: top; }
+th { font: 500 0.75rem/1.4 var(--mono); letter-spacing: .06em; text-transform: uppercase; color: var(--muted); }
+tr:last-child td { border-bottom: 0; }
+td.n { font-family: var(--mono); font-variant-numeric: tabular-nums; white-space: nowrap; }
+sup a { text-decoration: none; color: var(--accent); font: 500 0.75rem var(--mono); }
+
+.funnel { display: grid; gap: 12px; margin-top: 28px; }
+.f-row { display: grid; grid-template-columns: 140px 1fr 90px; gap: 14px; align-items: center; }
+.f-bar { height: 26px; background: var(--line); border-radius: 3px; position: relative; overflow: hidden; }
+.f-bar i { position: absolute; inset: 0 auto 0 0; background: var(--ink); border-radius: 3px; min-width: 3px; }
+.f-row.is-leak .f-bar i { background: var(--high); }
+.f-val { font: 500 0.9375rem var(--mono); text-align: right; font-variant-numeric: tabular-nums; }
+.f-conv { padding-left: 154px; font: 400 0.8125rem var(--mono); color: var(--muted); margin-top: -6px; }
+.f-conv.is-leak { color: var(--high); }
+@media (max-width: 560px) { .f-row { grid-template-columns: 96px 1fr 64px; gap: 10px; } .f-conv { padding-left: 106px; } }
+
+.leaks { display: grid; gap: 16px; }
+.leak { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); padding: 22px; display: grid; gap: 14px; }
+.leak-top { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 10px; align-items: baseline; }
+.leak-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 18px; }
+.leak-grid > div { display: grid; gap: 6px; align-content: start; min-width: 0; }
+.leak-grid p { font-size: 0.9375rem; }
+.leak-foot { display: flex; flex-wrap: wrap; gap: 8px 22px; padding-top: 12px; border-top: 1px dashed var(--line); }
+@media (max-width: 760px) { .leak-grid { grid-template-columns: 1fr; } }
+
+.math { font: 400 0.9375rem/1.9 var(--mono); background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); padding: 18px 20px; overflow-x: auto; white-space: pre; }
+.math b { color: var(--accent); font-weight: 500; }
+
+.plan { display: grid; grid-template-columns: repeat(3, 1fr); gap: 0; border-top: 1px solid var(--ink); }
+.plan > div { padding: 18px 20px 6px 0; display: grid; gap: 10px; align-content: start; min-width: 0; }
+.plan > div + div { padding-left: 20px; border-left: 1px solid var(--line); }
+.plan ul { margin: 0; padding-left: 18px; display: grid; gap: 6px; font-size: 0.9375rem; }
+@media (max-width: 760px) {
+  .plan { grid-template-columns: 1fr; }
+  .plan > div, .plan > div + div { padding: 18px 0; border-left: 0; border-bottom: 1px solid var(--line); }
+}
+
+.sources ol { margin: 0; padding-left: 20px; display: grid; gap: 8px; font-size: 0.875rem; color: var(--muted); }
+.sources a { color: var(--ink); }
+.cta { display: grid; gap: 14px; padding-block: 48px 64px; }
+.btn { display: inline-flex; align-items: center; justify-content: center; font: 500 0.9375rem/1 var(--body); padding: 13px 18px; border-radius: var(--radius); background: var(--ink); color: var(--bg); text-decoration: none; justify-self: start; }
+</style>
+</head>
+<body>
+
+<div class="sample-band">
+  <div class="wrap">
+    <span>SAMPLE REPORT · Fictional company · Illustrative figures</span>
+    <span>Benchmarks are real and sourced</span>
+  </div>
+</div>
+
+<header class="wrap cover">
+  <div class="brand">
+    <svg viewBox="0 0 32 32" aria-hidden="true"><rect x="1" y="1" width="30" height="30" rx="7" style="fill:var(--ink)"/><path d="M7 10 H15 A7 7 0 0 1 22 17 V25" style="fill:none;stroke:var(--bg)" stroke-width="4.5" stroke-linecap="round"/><circle cx="22" cy="25" r="2.6" style="fill:var(--accent)"/></svg>
+    <span class="brand-name">Pipewright <span>Studio</span></span>
+  </div>
+  <div style="display:grid;gap:14px">
+    <span class="label">Pipeline Leak Audit</span>
+    <h1>Northfield Analytics: where Q3 pipeline leaked, and what to fix first.</h1>
+    <p class="muted">Northfield is a fictional 60-person B2B SaaS company selling route analytics to logistics firms, with a 3-person marketing team on HubSpot. This sample shows the format and depth of a two-week audit.</p>
+  </div>
+  <div class="meta">
+    <div><span class="label">Ref</span><span class="v">PW-AUD-001</span></div>
+    <div><span class="label">Period reviewed</span><span class="v">Q3 2026</span></div>
+    <div><span class="label">Systems</span><span class="v">HubSpot, GA4, Salesforce</span></div>
+    <div><span class="label">Prepared by</span><span class="v">Abhinav Kumar</span></div>
+  </div>
+</header>
+
+<main>
+<section>
+  <div class="wrap summary">
+    <div class="score">
+      <span class="label">Pipeline health score</span>
+      <span class="score-num num">54<small> / 100</small></span>
+      <div class="meter" role="img" aria-label="54 out of 100"><i></i></div>
+      <span class="muted" style="font-size:.875rem">6 checks, weighted by revenue impact. 70+ is healthy.</span>
+    </div>
+    <div class="findings">
+      <span class="label">Summary</span>
+      <h2>Traffic and lead volume are fine. The leaks are after the lead arrives.</h2>
+      <div class="finding"><span class="pill high">High</span><p>Only <b class="num">6%</b> of MQLs become SQLs, against a widely cited B2B SaaS median of about <b class="num">13%</b>.<sup><a href="#s1">[1]</a></sup></p></div>
+      <div class="finding"><span class="pill high">High</span><p>Only <b class="num">22%</b> of opportunities can be traced to a campaign, so budget decisions are guesswork.</p></div>
+      <div class="finding"><span class="pill med">Medium</span><p>Nurture email click rate is <b class="num">1.4%</b>, against roughly <b class="num">3.2%</b> reported for B2B SaaS.<sup><a href="#s2">[2]</a></sup></p></div>
+      <p class="big-claim">Fixing lead scoring and the sales handoff alone is worth an estimated <span class="num">+16</span> sales-qualified leads per quarter from the leads Northfield already gets.</p>
+    </div>
+  </div>
+</section>
+
+<section>
+  <div class="wrap">
+    <div class="head">
+      <span class="label">Funnel · Q3 2026</span>
+      <h2>Benchmarks against the funnel.</h2>
+      <p class="muted">Sourced benchmarks are marked with a reference number. Rows without one use Pipewright working targets, which are stated as targets rather than industry data.</p>
+    </div>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>Metric</th><th>Northfield</th><th>Benchmark or target</th><th>Basis</th><th>Status</th></tr></thead>
+        <tbody>
+          <tr><td>MQL → SQL conversion</td><td class="n">6%</td><td class="n">~13% median</td><td>B2B SaaS median <sup><a href="#s1">[1]</a></sup></td><td><span class="pill high">Leak</span></td></tr>
+          <tr><td>Nurture email click rate</td><td class="n">1.4%</td><td class="n">~3.2%</td><td>B2B SaaS average <sup><a href="#s2">[2]</a></sup></td><td><span class="pill med">Below</span></td></tr>
+          <tr><td>Opportunities with campaign source</td><td class="n">22%</td><td class="n">90%+</td><td>Pipewright target</td><td><span class="pill high">Leak</span></td></tr>
+          <tr><td>Median MQL response time</td><td class="n">31 hrs</td><td class="n">Same business day</td><td>Pipewright target</td><td><span class="pill high">Leak</span></td></tr>
+          <tr><td>Campaign build time</td><td class="n">9 days</td><td class="n">3 days</td><td>Pipewright target</td><td><span class="pill med">Slow</span></td></tr>
+          <tr><td>SQL → opportunity</td><td class="n">58%</td><td class="n">~42%</td><td>Vendor-reported SaaS table <sup><a href="#s3">[3]</a></sup></td><td><span class="pill ok">Healthy</span></td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="funnel" aria-label="Funnel volumes for Q3 2026">
+      <div class="f-row"><span class="label">Leads</span><div class="f-bar"><i style="width:100%"></i></div><span class="f-val">1,200</span></div>
+      <span class="f-conv">33% become MQLs</span>
+      <div class="f-row"><span class="label">MQLs</span><div class="f-bar"><i style="width:33.3%"></i></div><span class="f-val">400</span></div>
+      <span class="f-conv is-leak">6% become SQLs · the main leak</span>
+      <div class="f-row is-leak"><span class="label">SQLs</span><div class="f-bar"><i style="width:2%"></i></div><span class="f-val">24</span></div>
+      <span class="f-conv">58% become opportunities</span>
+      <div class="f-row"><span class="label">Opportunities</span><div class="f-bar"><i style="width:1.17%"></i></div><span class="f-val">14</span></div>
+    </div>
+    <p class="label" style="margin-top:14px">Bars drawn to scale from 1,200 leads.</p>
+  </div>
+</section>
+
+<section>
+  <div class="wrap">
+    <div class="head">
+      <span class="label">Findings</span>
+      <h2>Five leaks, ranked by revenue impact.</h2>
+    </div>
+    <div class="leaks">
+      <article class="leak">
+        <div class="leak-top"><h3>Leak A · Lead scoring rewards activity, not fit</h3><span class="pill high">High</span></div>
+        <div class="leak-grid">
+          <div><span class="label">What we found</span><p>Scores come from email opens and page views only. 41% of Q3 MQLs were students, job seekers or companies under 10 staff.</p></div>
+          <div><span class="label">Why it matters</span><p>Sales stops trusting MQLs, follow-up slows down, and real buyers wait in the same queue as poor-fit leads.</p></div>
+          <div><span class="label">Fix</span><p>A two-part score: fit (industry, size, role) plus intent (pricing page, demo page, repeat visits). An MQL needs both.</p></div>
+        </div>
+        <div class="leak-foot"><span class="label">Effort · 1 week</span><span class="label">Owner · Marketing ops</span></div>
+      </article>
+      <article class="leak">
+        <div class="leak-top"><h3>Leak B · No agreed handoff between marketing and sales</h3><span class="pill high">High</span></div>
+        <div class="leak-grid">
+          <div><span class="label">What we found</span><p>MQLs land in a shared queue with no owner. Median first response is 31 hours, and 18% got no response at all.</p></div>
+          <div><span class="label">Why it matters</span><p>Interest fades quickly after a buyer raises a hand. Every unworked MQL is paid-for demand thrown away.</p></div>
+          <div><span class="label">Fix</span><p>Round-robin routing, a same-day response target, and a recycle path back into nurture for leads sales rejects.</p></div>
+        </div>
+        <div class="leak-foot"><span class="label">Effort · 1 week</span><span class="label">Owner · Marketing + sales lead</span></div>
+      </article>
+      <article class="leak">
+        <div class="leak-top"><h3>Leak C · Campaign source is not captured</h3><span class="pill high">High</span></div>
+        <div class="leak-grid">
+          <div><span class="label">What we found</span><p>UTM tags are used inconsistently and the opportunity record has no required source field. 78% of opportunities show "Direct" or blank.</p></div>
+          <div><span class="label">Why it matters</span><p>Nobody can show which programs create pipeline, so budget follows opinion.</p></div>
+          <div><span class="label">Fix</span><p>A UTM naming standard, a required source field on opportunities, and a weekly campaign-to-pipeline dashboard.</p></div>
+        </div>
+        <div class="leak-foot"><span class="label">Effort · 2 weeks</span><span class="label">Owner · Marketing ops + CRM admin</span></div>
+      </article>
+      <article class="leak">
+        <div class="leak-top"><h3>Leak D · One generic nurture for every lead</h3><span class="pill med">Medium</span></div>
+        <div class="leak-grid">
+          <div><span class="label">What we found</span><p>All leads get the same monthly newsletter, whatever their role or stage. Click rate is 1.4%.</p></div>
+          <div><span class="label">Why it matters</span><p>Ops managers and finance buyers care about different outcomes. Generic content trains people to ignore you.</p></div>
+          <div><span class="label">Fix</span><p>Three short nurture tracks by persona, each ending in a clear next step such as a demo or a cost calculator.</p></div>
+        </div>
+        <div class="leak-foot"><span class="label">Effort · 3 weeks</span><span class="label">Owner · Content + marketing ops</span></div>
+      </article>
+      <article class="leak">
+        <div class="leak-top"><h3>Leak E · Every campaign is built from scratch</h3><span class="pill med">Medium</span></div>
+        <div class="leak-grid">
+          <div><span class="label">What we found</span><p>No email or landing page templates, no QA checklist, and four rounds of review. A standard campaign takes 9 working days.</p></div>
+          <div><span class="label">Why it matters</span><p>A 3-person team ships fewer campaigns, and quality depends on who built each one.</p></div>
+          <div><span class="label">Fix</span><p>A reusable template library, an AI-assisted first draft trained on brand voice, one review step and a 10-point QA list.</p></div>
+        </div>
+        <div class="leak-foot"><span class="label">Effort · 2 weeks</span><span class="label">Owner · Marketing team</span></div>
+      </article>
+    </div>
+  </div>
+</section>
+
+<section>
+  <div class="wrap">
+    <div class="head">
+      <span class="label">Impact estimate</span>
+      <h2>What fixing Leaks A and B is worth.</h2>
+      <p class="muted">A conservative target of 10% MQL → SQL, still below the ~13% median, applied to Northfield's current MQL volume. Opportunity rate held at today's 58%.</p>
+    </div>
+<div class="math">MQLs per quarter              400
+SQLs today      400 × 6%   =   24
+SQLs at target  400 × 10%  =   40
+Extra SQLs                 =  <b>+16 per quarter</b>
+Extra opportunities  16 × 58% ≈  <b>+9 per quarter</b></div>
+  </div>
+</section>
+
+<section>
+  <div class="wrap">
+    <div class="head">
+      <span class="label">Plan</span>
+      <h2>30 / 60 / 90 days.</h2>
+    </div>
+    <div class="plan">
+      <div><span class="label">Days 1–30</span><h3>Stop the biggest leaks</h3><ul><li>Rebuild lead scoring (Leak A)</li><li>Routing and same-day response (Leak B)</li><li>UTM standard and required source field (Leak C)</li></ul></div>
+      <div><span class="label">Days 31–60</span><h3>Make it measurable</h3><ul><li>Campaign-to-pipeline dashboard</li><li>Template library and QA list (Leak E)</li><li>First weekly funnel review with sales</li></ul></div>
+      <div><span class="label">Days 61–90</span><h3>Grow what works</h3><ul><li>Three persona nurture tracks (Leak D)</li><li>AI-assisted campaign drafts</li><li>Re-score and compare against Q3</li></ul></div>
+    </div>
+  </div>
+</section>
+
+<section class="sources">
+  <div class="wrap">
+    <div class="head"><span class="label">Sources and method</span></div>
+    <ol>
+      <li id="s1">MQL → SQL median of ~13% for B2B SaaS, as cited from First Page Sage benchmark data and Salesforce State of Sales (2025) in <a href="https://www.flighted.co/blog/mql-to-sql-conversion-rate-benchmarks-for-b2b-saas" target="_blank" rel="noopener">Flighted</a> and <a href="https://breadcrumbs.io/?p=16563" target="_blank" rel="noopener">Breadcrumbs</a>. Other vendors report 18–40% depending on definitions, so 13% is the conservative reference.</li>
+      <li id="s2">B2B SaaS email click rate of ~3.2% from <a href="https://generate.folderly.com/blog/email-metrics-benchmarks-2025" target="_blank" rel="noopener">Folderly, Email Metrics Benchmarks 2025</a>. Click rate is used instead of open rate because Apple Mail Privacy Protection inflates opens.</li>
+      <li id="s3">SQL → opportunity of ~42% from a vendor-published B2B SaaS funnel table in <a href="https://www.understoryagency.com/blog/mql-to-sql-conversion-rate-benchmarks" target="_blank" rel="noopener">Understory</a>. Methodology is not published, so this is directional only.</li>
+      <li>Health score: six checks (lead quality, handoff speed, conversion, attribution, nurture engagement, production speed), each scored 0–100 and weighted by revenue impact.</li>
+    </ol>
+  </div>
+</section>
+
+<section class="cta">
+  <div class="wrap" style="display:grid;gap:14px">
+    <span class="label">Your audit</span>
+    <h2>Two weeks. Fixed scope. A plan you can act on the day it lands.</h2>
+    <p class="muted">We review your CRM, email, web analytics and campaign process, then walk your team through the findings in a 60-minute session.</p>
+    <a class="btn" href="https://calendly.com/abhinavkmr/discovery" target="_blank" rel="noopener">Book a discovery call</a>
+  </div>
+</section>
+</main>
+</body>
+</html>

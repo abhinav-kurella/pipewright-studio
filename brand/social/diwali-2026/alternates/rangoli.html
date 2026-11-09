@@ -1,0 +1,125 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Diwali Greeting</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Rozha+One&family=IBM+Plex+Mono:wght@500&family=IBM+Plex+Sans:wght@400;500&display=swap">
+<style>
+/* Concept: Amavasya, the moonless night of Diwali. A kolam of tiny lamps radiates from one diya. */
+:root {
+  --night: #0A0920;
+  --night-2: #16123A;
+  --ember: #3B1A10;
+  --gold: #F3B64A;
+  --gold-soft: #FFD98A;
+  --rose: #E9788C;
+  --ivory: #F6EBD9;
+  --muted: #B9AFC9;
+}
+html, body { margin: 0; padding: 0; background: var(--night); }
+#poster { position: relative; overflow: hidden; background: radial-gradient(ellipse at 50% 62%, var(--ember) 0%, var(--night-2) 38%, var(--night) 72%); }
+svg { position: absolute; inset: 0; display: block; }
+.copy { position: absolute; left: 0; right: 0; text-align: center; color: var(--ivory); }
+.eyebrow { font: 500 26px/1 "IBM Plex Mono", monospace; letter-spacing: .32em; text-transform: uppercase; color: var(--gold); opacity: .9; }
+.hindi { font-family: "Rozha One", serif; font-size: 132px; line-height: 1.25; margin: 22px 0 0; background: linear-gradient(180deg, var(--gold-soft) 10%, var(--gold) 55%, #D98A2B 100%); -webkit-background-clip: text; background-clip: text; color: transparent; filter: drop-shadow(0 0 28px rgba(243,182,74,.35)); }
+.english { font-family: "Rozha One", serif; font-size: 58px; line-height: 1; margin-top: 4px; color: var(--ivory); letter-spacing: .02em; }
+.wish { font: 400 30px/1.45 "IBM Plex Sans", sans-serif; color: var(--muted); margin: 0 auto; max-width: 760px; }
+.sign { font: 500 28px/1.4 "IBM Plex Sans", sans-serif; color: var(--ivory); }
+.sign span { display: block; font: 500 20px/1 "IBM Plex Mono", monospace; letter-spacing: .28em; text-transform: uppercase; color: var(--gold); margin-bottom: 14px; opacity: .85; }
+</style>
+</head>
+<body>
+<div id="poster">
+  <svg id="art" xmlns="http://www.w3.org/2000/svg"></svg>
+  <div class="copy" id="top">
+    <div class="eyebrow">Deepavali · 2026</div>
+    <div class="hindi">शुभ दीपावली</div>
+    <div class="english">Happy Diwali</div>
+  </div>
+  <div class="copy" id="wish"><p class="wish">May the light find every corner of your year:<br>your work, your home, and the people you love.</p></div>
+  <div class="copy sign" id="sign"><span>With warm wishes</span>Abhinav Kumar</div>
+</div>
+<script>
+const q = new URLSearchParams(location.search);
+const W = +q.get('w') || 1080, H = +q.get('h') || 1350;
+const tall = H / W > 1.5;
+const poster = document.getElementById('poster');
+poster.style.width = W + 'px'; poster.style.height = H + 'px';
+
+const cx = W / 2, cy = tall ? H * 0.53 : H * 0.6;
+const Rmax = tall ? 470 : 400;
+document.getElementById('top').style.top = (tall ? 210 : 92) + 'px';
+document.getElementById('wish').style.top = (cy + Rmax + (tall ? 70 : 28)) + 'px';
+document.getElementById("sign").style.bottom = (tall ? 110 : 56) + 'px';
+if (!tall) document.getElementById('wish').style.display = 'none';
+
+const NS = 'http://www.w3.org/2000/svg';
+const svg = document.getElementById('art');
+svg.setAttribute('viewBox', `0 0 ${W} ${H}`);
+svg.setAttribute('width', W); svg.setAttribute('height', H);
+const el = (n, a, p = svg) => { const e = document.createElementNS(NS, n); for (const k in a) e.setAttribute(k, a[k]); p.appendChild(e); return e; };
+const pol = (r, a) => [cx + r * Math.cos(a), cy + r * Math.sin(a)];
+
+const defs = el('defs', {});
+const glow = el('filter', { id: 'glow', x: '-50%', y: '-50%', width: '200%', height: '200%' }, defs);
+el('feGaussianBlur', { stdDeviation: 3.2, result: 'b' }, glow);
+const m = el('feMerge', {}, glow); el('feMergeNode', { in: 'b' }, m); el('feMergeNode', { in: 'SourceGraphic' }, m);
+const halo = el('filter', { id: 'halo', x: '-100%', y: '-100%', width: '300%', height: '300%' }, defs);
+el('feGaussianBlur', { stdDeviation: 30 }, halo);
+const flameG = el('linearGradient', { id: 'flame', x1: 0, y1: 1, x2: 0, y2: 0 }, defs);
+[['0', '#FF7A1A'], ['.45', '#FFC24A'], ['.8', '#FFF1C4'], ['1', '#FFFFFF']].forEach(([o, c]) => el('stop', { offset: o, 'stop-color': c }, flameG));
+const clay = el('linearGradient', { id: 'clay', x1: 0, y1: 0, x2: 0, y2: 1 }, defs);
+[['0', '#C8653A'], ['1', '#6E2A13']].forEach(([o, c]) => el('stop', { offset: o, 'stop-color': c }, clay));
+
+// faint stars: a moonless sky
+let seed = 7; const rnd = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
+for (let i = 0; i < 90; i++) {
+  const x = rnd() * W, y = rnd() * H * (tall ? 0.42 : 0.3);
+  el('circle', { cx: x, cy: y, r: rnd() * 1.4 + .4, fill: '#F6EBD9', opacity: (rnd() * .45 + .15).toFixed(2) });
+}
+
+// warm halo behind the diya
+el('circle', { cx, cy, r: 170, fill: '#FF9A3C', opacity: .32, filter: 'url(#halo)' });
+
+// rangoli petals: two rotated layers
+const petals = (n, r1, r2, spread, color, width, offset, op) => {
+  for (let k = 0; k < n; k++) {
+    const a = offset + k * 2 * Math.PI / n;
+    const [x0, y0] = pol(r1, a), [x2, y2] = pol(r2, a);
+    const rc = (r1 + r2) / 2;
+    const [c1x, c1y] = pol(rc, a + spread), [c2x, c2y] = pol(rc, a - spread);
+    el('path', { d: `M${x0} ${y0} Q${c1x} ${c1y} ${x2} ${y2} Q${c2x} ${c2y} ${x0} ${y0}Z`, fill: 'none', stroke: color, 'stroke-width': width, opacity: op });
+  }
+};
+petals(8, 120, Rmax * 0.78, 0.36, '#F3B64A', 2.2, -Math.PI / 2, .85);
+petals(8, 150, Rmax * 0.62, 0.30, '#E9788C', 1.6, -Math.PI / 2 + Math.PI / 8, .7);
+petals(16, Rmax * 0.8, Rmax * 0.97, 0.10, '#F3B64A', 1.4, -Math.PI / 2, .5);
+el('circle', { cx, cy, r: Rmax * 0.8, fill: 'none', stroke: '#F3B64A', 'stroke-width': 1, opacity: .35, 'stroke-dasharray': '2 9' });
+
+// kolam of lamps: rings of glowing points
+const rings = [[105, 12], [Rmax * 0.45, 24], [Rmax * 0.66, 32], [Rmax * 0.88, 48], [Rmax, 64]];
+const lamps = el('g', { filter: 'url(#glow)' });
+rings.forEach(([r, n], i) => {
+  for (let k = 0; k < n; k++) {
+    const a = -Math.PI / 2 + k * 2 * Math.PI / n + (i % 2 ? Math.PI / n : 0);
+    const [x, y] = pol(r, a);
+    const big = k % (n / 8) === 0;
+    el('circle', { cx: x, cy: y, r: big ? 5.2 : 3, fill: big ? '#FFD98A' : (i % 2 ? '#E9788C' : '#F3B64A') }, lamps);
+  }
+});
+
+// the diya
+const by = cy + 34;
+el('path', { d: `M${cx - 92} ${by - 22} Q${cx} ${by + 92} ${cx + 92} ${by - 22} Q${cx + 46} ${by - 6} ${cx} ${by - 8} Q${cx - 46} ${by - 6} ${cx - 92} ${by - 22}Z`, fill: 'url(#clay)' });
+el('path', { d: `M${cx - 92} ${by - 22} Q${cx - 46} ${by - 6} ${cx} ${by - 8} Q${cx + 46} ${by - 6} ${cx + 92} ${by - 22}`, fill: 'none', stroke: '#F3B64A', 'stroke-width': 3 });
+el('path', { d: `M${cx - 58} ${by + 22} Q${cx} ${by + 40} ${cx + 58} ${by + 22}`, fill: 'none', stroke: '#F3B64A', 'stroke-width': 1.6, opacity: .7, 'stroke-dasharray': '1 7', 'stroke-linecap': 'round' });
+el('ellipse', { cx, cy: by - 60, rx: 46, ry: 70, fill: '#FFB347', opacity: .55, filter: 'url(#halo)' });
+el('path', { d: `M${cx} ${by - 128} C${cx + 30} ${by - 82} ${cx + 26} ${by - 30} ${cx} ${by - 18} C${cx - 26} ${by - 30} ${cx - 30} ${by - 82} ${cx} ${by - 128}Z`, fill: 'url(#flame)', filter: 'url(#glow)' });
+el('path', { d: `M${cx} ${by - 80} C${cx + 11} ${by - 60} ${cx + 9} ${by - 34} ${cx} ${by - 28} C${cx - 9} ${by - 34} ${cx - 11} ${by - 60} ${cx} ${by - 80}Z`, fill: '#FFFFFF', opacity: .9 });
+
+document.fonts.ready.then(() => { document.body.dataset.ready = '1'; });
+</script>
+</body>
+</html>
