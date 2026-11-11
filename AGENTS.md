@@ -5,6 +5,14 @@
 This repo is **public**. It holds only what clients may see: the website, the sample audit and the brand kit.
 Pricing, sales scripts, prospects and client work live in the **private** repo `abhinav-kurella/pipewright-internal`. Never add confidential material here.
 
+## When Abhinav says he hit his limit on the other assistant
+
+A short message such as "hit my limit on the other one, continue from here", "limit hit, pick up" or "continue from Claude" (or ChatGPT) means: take over now. Do not ask him for context or a longer prompt.
+
+1. Read the status file on `main` in all four repos: `NOW.md` in abhinav-ai-ops-lab, pipewright-internal and pipewright-studio, and `Working-plan.md` (newest section) in nestarrival-uk. Also check open pull requests and the Google Drive folder "Assistant Handoff". Claude: attach any repo the session does not have yet.
+2. The newest dated entry across them is the work in flight. Reply in 5 lines or fewer: what was done, what is in flight, what you must not repeat (for example scheduled sends), and the next step.
+3. Start the next step straight away, unless it needs his approval.
+
 ## Switching between Claude and ChatGPT
 
 Abhinav moves between Claude, ChatGPT and Codex when one hits a usage limit. None of them sees the others' chats. This repo is the only shared memory.
@@ -16,7 +24,6 @@ Abhinav moves between Claude, ChatGPT and Codex when one hits a usage limit. Non
 5. **Decisions stay decided:** do not redo or re-ask anything recorded as decided. Read a file again just before editing it and keep the other assistant's changes.
 6. **Approvals do not change when switching:** nothing is sent, published, booked or paid for without Abhinav's approval.
 
-Prompt Abhinav pastes into the other assistant: "<Claude or ChatGPT> hit its limit. Continue my work in abhinav-kurella/pipewright-studio. Read AGENTS.md and NOW.md on main, then carry on from Next step."
 
 ## What's here
 - `index.html`: the whole website (single static file, offline-friendly, Pitch mode). Hosted with GitHub Pages from `main` / root.
